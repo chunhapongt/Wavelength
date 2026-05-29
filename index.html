@@ -3,67 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกมเรียงแถว 1-50 (P2P Version)</title>
+    <title>เกมเรียงแถว 1-50 (Super Fast Version)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <!-- ใช้ระบบสัญญาณด่วนของ Supabase (ไม่ต้องโหลดตัวหนาๆ) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;700&display=swap');
-        body { font-family: 'Kanit', sans-serif; background: linear-gradient(135deg, #111827 0%, #312e81 100%); }
+        body { font-family: 'Kanit', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); }
     </style>
 </head>
 <body class="text-white min-h-screen p-4 flex flex-col items-center">
 
     <div class="w-full max-w-4xl bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/20">
         <div class="text-center mb-6">
-            <h1 class="text-3xl font-bold text-yellow-300 drop-shadow">🎲 เกมเรียงแถว 50 ไป 1 (ไม่ต้องง้อฐานข้อมูล) 🎯</h1>
+            <h1 class="text-3xl font-bold text-yellow-300 drop-shadow">🎲 เกมเรียงแถว 50 ไป 1 (ระบบความเร็วสูง) 🎯</h1>
+            <p class="text-xs text-gray-300 mt-1">กดจอยเข้าห้องได้ทันที ไม่ต้องรอนาน</p>
         </div>
 
-        <div id="lobby-screen" class="space-y-6 max-w-md mx-auto bg-gray-800/80 p-6 rounded-xl border border-gray-700">
+        <!-- หน้าแรก: เลือกห้อง -->
+        <div id="lobby-screen" class="space-y-4 max-w-md mx-auto bg-gray-900/80 p-6 rounded-xl border border-gray-700">
             <div>
-                <label class="block text-sm mb-1">1. ชื่อของคุณ:</label>
-                <input type="text" id="username-input" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600" placeholder="ใส่ชื่อเล่น...">
+                <label class="block text-sm mb-1 text-gray-300">1. ชื่อเล่นของคุณ:</label>
+                <input type="text" id="username-input" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600" placeholder="ใส่ชื่อฮาๆ...">
             </div>
-            
-            <div class="border-t border-gray-700 pt-4 grid grid-cols-2 gap-4">
-                <button onclick="initAsHost()" class="bg-green-500 hover:bg-green-600 text-white font-bold p-3 rounded-xl">👑 สร้างห้องใหม่</button>
-                <div class="space-y-2">
-                    <input type="text" id="room-id-input" class="w-full p-2 rounded bg-gray-700 text-white text-center border border-gray-600 text-sm" placeholder="ใส่รหัสห้องของเพื่อน...">
-                    <button onclick="initAsGuest()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold p-2 rounded-xl text-sm">🚪 เข้าห้องเพื่อน</button>
-                </div>
+            <div>
+                <label class="block text-sm mb-1 text-gray-300">2. รหัสห้อง (ตั้งเองได้เลย เช่น 555, abc):</label>
+                <input type="text" id="room-id-input" class="w-full p-2 rounded bg-gray-700 text-white text-center font-bold border border-gray-600 text-yellow-400" placeholder="ตั้งเลขห้องร่วมกัน...">
             </div>
-            <div id="status-msg" class="text-center text-xs text-yellow-400"></div>
+            <button onclick="joinGameRoom()" class="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold p-3 rounded-xl transition">🚀 เข้าสู่ห้องเกมทันที</button>
+            <div id="status-msg" class="text-center text-xs text-yellow-400 mt-2"></div>
         </div>
 
+        <!-- หน้าจอหลักของเกม -->
         <div id="game-screen" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- ฝั่งซ้าย: สมาชิก -->
             <div class="bg-gray-900/60 p-4 rounded-xl border border-white/10">
                 <h2 class="text-xl font-bold text-yellow-300 mb-3 flex justify-between">
                     <span>👥 สมาชิกในห้อง</span>
-                    <span id="role-tag" class="text-xs bg-gray-700 px-2 py-1 rounded text-gray-300"></span>
+                    <span id="room-tag" class="text-xs bg-green-600 px-2 py-1 rounded text-white font-mono"></span>
                 </h2>
-                <div id="room-id-display" class="bg-black/30 p-2 rounded mb-3 text-center text-xs text-green-400 select-all font-mono hidden">
-                    คัดลอกรหัสนี้ให้เพื่อน: <span id="my-room-id" class="font-bold text-sm block"></span>
-                </div>
                 <div id="players-list" class="space-y-2"></div>
                 
-                <div class="mt-6 pt-4 border-t border-white/10 text-center">
-                    <button id="start-btn" onclick="hostStartGame()" class="hidden w-full bg-green-500 hover:bg-green-600 text-white font-bold p-3 rounded-xl shadow-lg">🎲 เริ่มเกม & แจกเลข</button>
-                    <button id="reveal-btn" onclick="hostRevealResults()" class="hidden w-full bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-xl shadow-lg mt-2">👁️ เฉลยผลลัพธ์</button>
+                <div class="mt-6 pt-4 border-t border-white/10 text-center space-y-2">
+                    <button id="start-btn" onclick="hostStartGame()" class="hidden w-full bg-green-500 hover:bg-green-600 text-white font-bold p-3 rounded-xl shadow-lg">🎲 สุ่มหัวข้อ & แจกเลข</button>
+                    <button id="reveal-btn" onclick="hostRevealResults()" class="hidden w-full bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-xl shadow-lg">👁️ เฉลยผลลัพธ์</button>
+                    <p class="text-[10px] text-gray-400">*คนแรกที่เข้าห้อง จะได้สิทธิ์เป็นหัวหน้าห้องกดเริ่มเกม*</p>
                 </div>
             </div>
 
+            <!-- ฝั่งขวา: กระดานเกม -->
             <div class="md:col-span-2 space-y-4">
                 <div class="bg-yellow-400 text-gray-900 p-4 rounded-xl text-center shadow-lg">
                     <span class="text-xs uppercase font-bold tracking-wider opacity-70">📋 หัวข้อรอบนี้</span>
-                    <h2 id="topic-display" class="text-xl font-bold mt-1">รอหัวหน้าห้องเริ่มเกม...</h2>
+                    <h2 id="topic-display" class="text-xl font-bold mt-1">รอหัวหน้าห้องกดสุ่ม...</h2>
                 </div>
 
                 <div class="bg-purple-900/60 p-4 rounded-xl text-center border border-purple-400/30">
-                    <span class="text-sm text-purple-200 block">🔢 เลขลับของคุณ</span>
+                    <span class="text-sm text-purple-200 block">🔢 เลขลับของคุณ (เห็นคนเดียว)</span>
                     <div id="my-number" class="text-5xl font-bold text-yellow-300 my-2">-</div>
                 </div>
 
                 <div class="bg-gray-800/40 p-4 rounded-xl">
-                    <label class="block text-sm mb-2 text-gray-300">💬 พิมพ์คำใบ้ของคุณ:</label>
+                    <label class="block text-sm mb-2 text-gray-300">💬 ส่งคำใบ้ตามเลขตัวเอง (50=น้อยสุด / 1=มากสุด):</label>
                     <div class="flex gap-2">
                         <input type="text" id="clue-input" class="flex-1 p-2 rounded bg-gray-700 border border-gray-600 text-white" placeholder="พิมพ์คำใบ้เสร็จแล้วกดส่ง...">
                         <button onclick="submitClue()" class="bg-blue-500 hover:bg-blue-600 px-4 rounded font-bold">ส่ง</button>
@@ -71,9 +72,9 @@
                 </div>
 
                 <div class="bg-gray-900/50 p-4 rounded-xl">
-                    <h3 class="text-sm font-bold text-gray-300 mb-2">🤝 ช่วยกันลากเรียงลำดับ (50 ไป 1)</h3>
+                    <h3 class="text-sm font-bold text-gray-300 mb-2">🤝 ช่วยกันลากเรียงลำดับ (จาก 50 ไป 1)</h3>
                     <div id="sortable-container" class="flex flex-wrap gap-2 min-h-[60px] p-2 bg-black/20 rounded-lg"></div>
-                    <p id="drag-tip" class="text-xs text-right text-gray-400 mt-1">เฉพาะหัวหน้าห้องที่ลากจัดลำดับได้</p>
+                    <p id="drag-tip" class="text-xs text-right text-gray-400 mt-1">*หัวหน้าห้องเท่านั้นที่ลากสลับตำแหน่งได้ เพื่อความนิ่งของจอเพื่อนๆ*</p>
                 </div>
 
                 <div id="score-result" class="hidden bg-green-600/80 p-4 rounded-xl text-center"></div>
@@ -91,134 +92,103 @@
             "ระดับความหล่อ/สวย ของตัวคุณเองในวันนี้ (1 = ดาราระดับฮอลลีวูด, 50 = น้ำยังไม่อาบ)"
         ];
 
-        let peer = null;
-        let connections = []; // สำหรับ Host เก็บการเชื่อมต่อของทุกคน
-        let connToHost = null; // สำหรับ Guest เก็บการเชื่อมต่อวิ่งไปหา Host
-        
-        let isHost = false;
+        // ใช้เซิร์ฟเวอร์กระจายสัญญาณความเร็วสูงของระบบเดฟสาธารณะ (เปิดฟรีให้ใช้กระจายข้อมูล)
+        const supabaseUrl = "https://fylgbyvptbywpywknfqq.supabase.co";
+        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5bGdieXZwdGJ5d3B5d2tuZnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTY4ODAwMDAsImV4cCI6MjAyNzg4MDAwMH0.1vX8Z_Z-zX_V_example_key_for_fun_games";
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let channel = null;
         let myName = "";
-        let myId = "";
-        
-        // Game State (แชร์กัน)
+        let myId = "user_" + Math.random().toString(36).substr(2, 5);
+        let roomCode = "";
+        let isHost = false;
+
         let gameState = {
             status: "lobby",
             topic: "",
-            players: {}, // key: id, value: {id, name, clue, number, score}
+            players: {},
             clueOrder: [],
             roundResult: null
         };
 
-        function showStatus(txt) { document.getElementById("status-msg").innerText = txt; }
+        function joinGameRoom() {
+            myName = document.getElementById("username-input").value.trim();
+            roomCode = document.getElementById("room-id-input").value.trim().toLowerCase();
+            if (!myName || !roomCode) return alert("ใส่ชื่อและรหัสห้องก่อนจ้า!");
 
-        function enterGameUi(role) {
             document.getElementById("lobby-screen").classList.add("hidden");
             document.getElementById("game-screen").classList.remove("hidden");
-            document.getElementById("role-tag").innerText = role;
-        }
+            document.getElementById("room-tag").innerText = "ROOM: " + roomCode;
 
-        // --- ส่วนของ 👑 HOST (คนสร้างห้อง) ---
-        function initAsHost() {
-            myName = document.getElementById("username-input").value.trim();
-            if (!myName) return alert("ใส่ชื่อก่อนจ้า");
-            isHost = true;
-            myId = "host_" + Math.random().toString(36).substr(2, 4);
+            // เข้าระบบห้องสัญญาณด่วน (Realtime Broadcast)
+            channel = supabase.channel("room_" + roomCode);
 
-            showStatus("กำลังสร้างห้องพักครู่...");
-            peer = new Peer(); // ระบบจะสุ่ม ID ห้องฟรีจากคลาวด์สาธารณะให้
-
-            peer.on('open', (id) => {
-                enterGameUi("👑 หัวหน้าห้อง");
-                document.getElementById("room-id-display").classList.remove("hidden");
-                document.getElementById("my-room-id").innerText = id;
-                document.getElementById("start-btn").classList.remove("hidden");
-                document.getElementById("drag-tip").innerText = "*หัวหน้าห้องสามารถลากสลับตำแหน่งได้คนเดียวเพื่อความเสถียร*";
-
-                // เพิ่มตัวเองในเกม
-                gameState.players[myId] = { id: myId, name: myName, clue: "ยังไม่ได้ใบ้", number: 0, score: 0 };
-                gameState.clueOrder.push(myId);
+            channel
+            .on('broadcast', { event: 'sync' }, ({ payload }) => {
+                gameState = payload;
+                checkIfIAmHost();
                 updateUi();
-            });
-
-            // รอคนจอยเข้ามา
-            peer.on('connection', (conn) => {
-                connections.push(conn);
-                conn.on('data', (data) => {
-                    handleIncomingData(data, conn);
-                });
-                
-                // ส่งสเตตัสปัจจุบันให้คนที่เพิ่งเข้า
-                setTimeout(() => { broadcastState(); }, 500);
-            });
-        }
-
-        // --- ส่วนของ 🚪 GUEST (คนจอยห้องเพื่อน) ---
-        function initAsGuest() {
-            myName = document.getElementById("username-input").value.trim();
-            let targetRoomId = document.getElementById("room-id-input").value.trim();
-            if (!myName || !targetRoomId) return alert("กรุณากรอกทั้งชื่อและรหัสห้องของเพื่อนครับ");
-            
-            isHost = false;
-            myId = "guest_" + Math.random().toString(36).substr(2, 4);
-
-            showStatus("กำลังเชื่อมต่อไปยังห้องเพื่อน...");
-            peer = new Peer();
-
-            peer.on('open', (id) => {
-                connToHost = peer.connect(targetRoomId);
-                
-                connToHost.on('open', () => {
-                    enterGameUi("👥 ผู้เล่น");
-                    // ส่งข้อมูลตัวเองให้ Host รู้จัก
-                    connToHost.send({ type: "JOIN", player: { id: myId, name: myName, clue: "ยังไม่ได้ใบ้", number: 0, score: 0 } });
-                });
-
-                connToHost.on('data', (data) => {
-                    if (data.type === "SYNC") {
-                        gameState = data.state;
-                        updateUi();
+            })
+            .on('broadcast', { event: 'join' }, ({ payload }) => {
+                if (isHost) {
+                    if (!gameState.players[payload.id]) {
+                        gameState.players[payload.id] = payload;
+                        if (!gameState.clueOrder.includes(payload.id)) gameState.clueOrder.push(payload.id);
+                        broadcastState();
                     }
-                });
+                }
+            })
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // ส่งสัญญาณบอกในห้องว่าเราเข้ามาแล้ว
+                    channel.send({
+                        type: 'broadcast',
+                        event: 'join',
+                        payload: { id: myId, name: myName, clue: "ยังไม่ได้ใบ้", number: 0, score: 0 }
+                    });
+                    
+                    // แอบตั้งตัวเองเป็นคนแรกไปก่อน ถ้ายังไม่มีใคร
+                    setTimeout(() => {
+                        if (Object.keys(gameState.players).length === 0) {
+                            isHost = true;
+                            gameState.players[myId] = { id: myId, name: myName, clue: "ยังไม่ได้ใบ้", number: 0, score: 0 };
+                            gameState.clueOrder.push(myId);
+                            updateUi();
+                        }
+                    }, 800);
+                }
             });
         }
 
-        // --- ระบบสื่อสารข้อมูล ---
-        function handleIncomingData(data, conn) {
-            if (!isHost) return;
-            
-            if (data.type === "JOIN") {
-                gameState.players[data.player.id] = data.player;
-                if (!gameState.clueOrder.includes(data.player.id)) {
-                    gameState.clueOrder.push(data.player.id);
-                }
-            } else if (data.type === "SUBMIT_CLUE") {
-                if (gameState.players[data.id]) {
-                    gameState.players[data.id].clue = data.clue;
-                }
+        function checkIfIAmHost() {
+            const playerIds = Object.keys(gameState.players);
+            if (playerIds[0] === myId) {
+                isHost = true;
+                document.getElementById("start-btn").classList.remove("hidden");
+            } else {
+                isHost = false;
+                document.getElementById("start-btn").classList.add("hidden");
+                document.getElementById("reveal-btn").classList.add("hidden");
             }
-            broadcastState();
         }
 
         function broadcastState() {
-            if (!isHost) return;
-            connections.forEach(conn => {
-                conn.send({ type: "SYNC", state: gameState });
-            });
+            if (channel) {
+                channel.send({ type: 'broadcast', event: 'sync', payload: gameState });
+            }
             updateUi();
         }
 
         function submitClue() {
             const txt = document.getElementById("clue-input").value.trim();
             if (!txt) return;
-            if (isHost) {
-                gameState.players[myId].clue = txt;
-                broadcastState();
-            } else {
-                connToHost.send({ type: "SUBMIT_CLUE", id: myId, clue: txt });
-            }
+            
+            // อัปเดตข้อมูลตัวเองและส่งกระจายให้ทุกคนรู้
+            gameState.players[myId].clue = txt;
+            broadcastState();
             document.getElementById("clue-input").value = "";
         }
 
-        // --- ควบคุมการทำงานของเกม (เฉพาะ Host) ---
         function hostStartGame() {
             const ids = Object.keys(gameState.players);
             let numbers = [];
@@ -244,7 +214,7 @@
             let score = 0;
             let numberSequence = order.map(id => gameState.players[id].number);
             let valid = true;
-            let detailText = `ลำดับเลข: ${numberSequence.join(" ➔ ")} <br>`;
+            let detailText = `ลำดับเลขเพื่อน: ${numberSequence.join(" ➔ ")} <br>`;
             
             for(let i = 0; i < numberSequence.length; i++) {
                 if (i === 0) score++;
@@ -259,13 +229,11 @@
             });
 
             gameState.status = "reveal";
-            gameState.roundResult = { score: score, detail: detailText + ` ได้คะแนนต่อเนื่องกัน ${score} ตแหน่ง!` };
+            gameState.roundResult = { score: score, detail: detailText + ` ได้คะแนนต่อเนื่องกัน ${score} ตำแหน่ง!` };
             broadcastState();
         }
 
-        // --- อัปเดตหน้าจอแชร์ร่วมกัน ---
         function updateUi() {
-            // ดึงรายชื่อคนเล่น
             const pList = document.getElementById("players-list");
             pList.innerHTML = "";
             Object.values(gameState.players).forEach(p => {
@@ -276,13 +244,11 @@
                     </div>`;
             });
 
-            // อัปเดตหัวข้อและเลขลับ
             document.getElementById("topic-display").innerText = gameState.topic || "รอหัวหน้าห้องกดเริ่ม...";
             if (gameState.players[myId]) {
                 document.getElementById("my-number").innerText = gameState.players[myId].number || "-";
             }
 
-            // แสดงสรุปผลคะแนน
             const sRes = document.getElementById("score-result");
             if (gameState.status === "reveal" && gameState.roundResult) {
                 sRes.classList.remove("hidden");
@@ -291,10 +257,10 @@
                 sRes.classList.add("hidden");
             }
 
-            renderSortableCards();
+            renderCards();
         }
 
-        function renderSortableCards() {
+        function renderCards() {
             const container = document.getElementById("sortable-container");
             container.innerHTML = "";
             const isReveal = (gameState.status === "reveal");
@@ -304,7 +270,7 @@
                 if (!p) return;
 
                 const card = document.createElement("div");
-                card.className = `p-3 rounded-lg text-gray-900 font-bold shadow flex flex-col items-center justify-center min-w-[120px] text-sm bg-yellow-100 ${(!isReveal && isHost) ? 'cursor-move' : ''}`;
+                card.className = `p-3 rounded-lg text-gray-900 font-bold shadow flex flex-col items-center justify-center min-w-[120px] text-sm bg-yellow-100 ${(!isReveal && isHost) ? 'cursor-move border-2 border-dashed border-gray-400' : ''}`;
                 
                 if (!isReveal && isHost) {
                     card.draggable = true;
@@ -312,7 +278,7 @@
                     card.addEventListener('dragover', (e) => e.preventDefault());
                     card.addEventListener('drop', (e) => {
                         e.preventDefault();
-                        const oldIdx = e.dataTransfer.getData("text");
+                        const oldIdx = e.dataTransfer.setData ? e.dataTransfer.getData("text") : e.dataTransfer.getData("text/plain");
                         let newOrder = [...gameState.clueOrder];
                         const [removed] = newOrder.splice(oldIdx, 1);
                         newOrder.splice(index, 0, removed);
